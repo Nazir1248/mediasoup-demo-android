@@ -152,13 +152,42 @@ public class RoomClient extends RoomMessageHandler {
         });
   }
 
-  @Async
-  public void enableMic() {
-    Logger.d(TAG, "enableMic()");
-    mWorkHandler.post(this::enableMicImpl);
-  }
+//  @Async
+//  public void enableMic() {
+//    Logger.d(TAG, "enableMic()");
+//    mWorkHandler.post(this::enableMicImpl);
+//  }
 
-  @Async
+//    @Async
+//    public void enableMic() {
+//        if (!canProduce()) {
+//            Logger.w(TAG, "enableMic() ignored, transport not ready");
+//            return;
+//        }
+//        mWorkHandler.post(this::enableMicImpl);
+//    }
+
+    @Async
+    public void enableMic() {
+        Logger.e("DEBUG_FLOW", "enableMic() called");
+        Logger.e("DEBUG_FLOW", "mClosed = " + mClosed);
+        Logger.e("DEBUG_FLOW", "mSendTransport = " + (mSendTransport != null));
+        Logger.e("DEBUG_FLOW", "mDevice = " + (mMediasoupDevice != null));
+        Logger.e("DEBUG_FLOW", "deviceLoaded = " +
+                (mMediasoupDevice != null && mMediasoupDevice.isLoaded()));
+
+        if (!canProduce()) {
+            Logger.e("DEBUG_FLOW", "❌ canProduce() = false");
+            return;
+        }
+
+        Logger.e("DEBUG_FLOW", "✅ canProduce() = true");
+        mWorkHandler.post(this::enableMicImpl);
+    }
+
+
+
+    @Async
   public void disableMic() {
     Logger.d(TAG, "disableMic()");
     mWorkHandler.post(this::disableMicImpl);
@@ -169,14 +198,31 @@ public class RoomClient extends RoomMessageHandler {
     Logger.d(TAG, "muteMic()");
     mWorkHandler.post(this::muteMicImpl);
   }
+    private boolean canProduce() {
+        return !mClosed
+                && mSendTransport != null
+                && mMediasoupDevice != null
+                && mMediasoupDevice.isLoaded();
+    }
 
-  @Async
-  public void unmuteMic() {
-    Logger.d(TAG, "unmuteMic()");
-    mWorkHandler.post(this::unmuteMicImpl);
-  }
 
-  @Async
+//  @Async
+//  public void unmuteMic() {
+//    Logger.d(TAG, "unmuteMic()");
+//    mWorkHandler.post(this::unmuteMicImpl);
+//  }
+
+
+    @Async
+    public void unmuteMic() {
+        if (!canProduce()) {
+            Logger.w(TAG, "unmuteMic() ignored, transport not ready");
+            return;
+        }
+        mWorkHandler.post(this::unmuteMicImpl);
+    }
+
+    @Async
   public void enableCam() {
     Logger.d(TAG, "enableCam()");
     mStore.setCamInProgress(true);
@@ -251,10 +297,14 @@ public class RoomClient extends RoomMessageHandler {
     Logger.d(TAG, "disableAudioOnly()");
     mStore.setAudioOnlyInProgress(true);
 
-    if (mCamProducer == null && mOptions.isProduce()) {
-      enableCam();
-    }
-    mWorkHandler.post(
+//    if (mCamProducer == null && mOptions.isProduce()) {
+//      enableCam();
+//    }
+      if (!mStore.getMe().getValue().isAudioOnly()) {
+          enableCam();
+      }
+
+      mWorkHandler.post(
         () -> {
           for (ConsumerHolder holder : mConsumers.values()) {
             if (!"video".equals(holder.mConsumer.getKind())) {
@@ -653,7 +703,9 @@ public class RoomClient extends RoomMessageHandler {
           mPeerConnectionUtils.dispose();
 
           // quit worker handler thread.
-          mWorkHandler.getLooper().quit();
+//          mWorkHandler.getLooper().quit();
+            mWorkHandler.getLooper().quitSafely();
+
         });
 
     // dispose request.
@@ -827,8 +879,8 @@ public class RoomClient extends RoomMessageHandler {
         boolean canSendMic = mMediasoupDevice.canProduce("audio");
         boolean canSendCam = mMediasoupDevice.canProduce("video");
         mStore.setMediaCapabilities(canSendMic, canSendCam);
-        mMainHandler.post(this::enableMic);
-        mMainHandler.post(this::enableCam);
+//        mMainHandler.post(this::enableMic);
+//        mMainHandler.post(this::enableCam);
       }
     } catch (Exception e) {
       e.printStackTrace();
@@ -844,8 +896,15 @@ public class RoomClient extends RoomMessageHandler {
 
   @WorkerThread
   private void enableMicImpl() {
-    Logger.d(TAG, "enableMicImpl()");
-    try {
+
+      Logger.d(TAG, "enableMicImpl()");
+      Logger.d(TAG, "sendTransport=" + (mSendTransport != null));
+      Logger.d(TAG, "deviceLoaded=" + mMediasoupDevice.isLoaded());
+      Logger.e("DEBUG_FLOW", "mMicProducer = " + (mMicProducer != null));
+      Logger.e("DEBUG_FLOW", "mSendTransport = " + (mSendTransport != null));
+      Logger.e("DEBUG_FLOW", "deviceLoaded = " + mMediasoupDevice.isLoaded());
+
+      try {
       if (mMicProducer != null) {
         return;
       }
@@ -854,18 +913,22 @@ public class RoomClient extends RoomMessageHandler {
         return;
       }
       if (!mMediasoupDevice.canProduce("audio")) {
-        Logger.w(TAG, "enableMic() | cannot produce audio");
+          Logger.e("DEBUG_FLOW", "❌ Device cannot produce AUDIO");
+          Logger.w(TAG, "enableMic() | cannot produce audio");
         return;
       }
       if (mSendTransport == null) {
-        Logger.w(TAG, "enableMic() | mSendTransport doesn't ready");
+          Logger.e("DEBUG_FLOW", "❌ SendTransport is NULL");
+          Logger.w(TAG, "enableMic() | mSendTransport doesn't ready");
         return;
       }
       if (mLocalAudioTrack == null) {
         mLocalAudioTrack = mPeerConnectionUtils.createAudioTrack(mContext, "mic");
         mLocalAudioTrack.setEnabled(true);
       }
-      mMicProducer =
+          Logger.e("DEBUG_FLOW", "🎤 Creating audio track...");
+
+          mMicProducer =
           mSendTransport.produce(
               producer -> {
                 Logger.e(TAG, "onTransportClose(), micProducer");
@@ -879,7 +942,7 @@ public class RoomClient extends RoomMessageHandler {
               null,
               null);
       mStore.addProducer(mMicProducer);
-    } catch (MediasoupException e) {
+      } catch (MediasoupException e) {
       e.printStackTrace();
       logError("enableMic() | failed:", e);
       mStore.addNotify("error", "Error enabling microphone: " + e.getMessage());
@@ -908,38 +971,68 @@ public class RoomClient extends RoomMessageHandler {
     mMicProducer = null;
   }
 
-  @WorkerThread
-  private void muteMicImpl() {
-    Logger.d(TAG, "muteMicImpl()");
-    mMicProducer.pause();
+//  @WorkerThread
+//  private void muteMicImpl() {
+//    Logger.d(TAG, "muteMicImpl()");
+//    mMicProducer.pause();
+//
+//    try {
+//      mProtoo.syncRequest("pauseProducer", req -> jsonPut(req, "producerId", mMicProducer.getId()));
+//      mStore.setProducerPaused(mMicProducer.getId());
+//    } catch (ProtooException e) {
+//      e.printStackTrace();
+//      logError("muteMic() | failed:", e);
+//      mStore.addNotify("error", "Error pausing server-side mic Producer: " + e.getMessage());
+//    }
+//  }
 
-    try {
-      mProtoo.syncRequest("pauseProducer", req -> jsonPut(req, "producerId", mMicProducer.getId()));
-      mStore.setProducerPaused(mMicProducer.getId());
-    } catch (ProtooException e) {
-      e.printStackTrace();
-      logError("muteMic() | failed:", e);
-      mStore.addNotify("error", "Error pausing server-side mic Producer: " + e.getMessage());
+    @WorkerThread
+    private void muteMicImpl() {
+        Logger.d(TAG, "muteMicImpl()");
+        if (mMicProducer == null) return;
+
+        mMicProducer.pause();
+        try {
+            mProtoo.syncRequest(
+                    "pauseProducer",
+                    req -> jsonPut(req, "producerId", mMicProducer.getId())
+            );
+            mStore.setProducerPaused(mMicProducer.getId());
+        } catch (Exception e) {
+            logError("muteMicImpl failed", e);
+        }
     }
-  }
 
-  @WorkerThread
-  private void unmuteMicImpl() {
-    Logger.d(TAG, "unmuteMicImpl()");
-    mMicProducer.resume();
 
-    try {
-      mProtoo.syncRequest(
-          "resumeProducer", req -> jsonPut(req, "producerId", mMicProducer.getId()));
-      mStore.setProducerResumed(mMicProducer.getId());
-    } catch (ProtooException e) {
-      e.printStackTrace();
-      logError("unmuteMic() | failed:", e);
-      mStore.addNotify("error", "Error resuming server-side mic Producer: " + e.getMessage());
+//    @WorkerThread
+//  private void unmuteMicImpl() {
+//    Logger.d(TAG, "unmuteMicImpl()");
+//    mMicProducer.resume();
+//
+//    try {
+//      mProtoo.syncRequest(
+//          "resumeProducer", req -> jsonPut(req, "producerId", mMicProducer.getId()));
+//      mStore.setProducerResumed(mMicProducer.getId());
+//    } catch (ProtooException e) {
+//      e.printStackTrace();
+//      logError("unmuteMic() | failed:", e);
+//      mStore.addNotify("error", "Error resuming server-side mic Producer: " + e.getMessage());
+//    }
+//  }
+
+    @WorkerThread
+    private void unmuteMicImpl() {
+        Logger.d(TAG, "unmuteMicImpl()");
+        if (mMicProducer == null) {
+            Logger.w(TAG, "unmuteMicImpl() | mMicProducer is null, re-enabling mic");
+            enableMicImpl();   // 👈 recreate producer safely
+            return;
+        }
+        mMicProducer.resume();
     }
-  }
 
-  @WorkerThread
+
+    @WorkerThread
   private void enableCamImpl() {
     Logger.d(TAG, "enableCamImpl()");
     try {
@@ -1115,35 +1208,79 @@ public class RoomClient extends RoomMessageHandler {
           return producerDataId;
         }
 
+//        @Override
+//        public void onConnect(Transport transport, String dtlsParameters) {
+//          if (mClosed) {
+//            return;
+//          }
+//          Logger.d(listenerTAG + "_send", "onConnect()");
+//          mCompositeDisposable.add(
+//              mProtoo
+//                  .request(
+//                      "connectWebRtcTransport",
+//                      req -> {
+//                        jsonPut(req, "transportId", transport.getId());
+//                        jsonPut(req, "dtlsParameters", toJsonObject(dtlsParameters));
+//                      })
+//                  .subscribe(
+//                      d -> Logger.d(listenerTAG, "connectWebRtcTransport res: " + d),
+//                      t -> logError("connectWebRtcTransport for mSendTransport failed", t)));
+//        }
         @Override
         public void onConnect(Transport transport, String dtlsParameters) {
-          if (mClosed) {
-            return;
-          }
-          Logger.d(listenerTAG + "_send", "onConnect()");
-          mCompositeDisposable.add(
-              mProtoo
-                  .request(
-                      "connectWebRtcTransport",
-                      req -> {
-                        jsonPut(req, "transportId", transport.getId());
-                        jsonPut(req, "dtlsParameters", toJsonObject(dtlsParameters));
-                      })
-                  .subscribe(
-                      d -> Logger.d(listenerTAG, "connectWebRtcTransport res: " + d),
-                      t -> logError("connectWebRtcTransport for mSendTransport failed", t)));
+            try {
+                JSONObject dtls = new JSONObject(dtlsParameters);
+                dtls.put("role", "client");   // 🔥 REQUIRED
+
+                mCompositeDisposable.add(
+                        mProtoo.request(
+                                "connectWebRtcTransport",
+                                req -> {
+                                    jsonPut(req, "transportId", transport.getId());
+                                    jsonPut(req, "dtlsParameters", dtls);
+                                }
+                        ).subscribe(
+                                d -> Logger.d(TAG, "DTLS connected"),
+                                t -> logError("DTLS connect failed", t)
+                        )
+                );
+            } catch (Exception e) {
+                logError("DTLS role fix failed", e);
+            }
         }
 
+
+          //        @Override
+//        public void onConnectionStateChange(Transport transport, String connectionState) {
+//          Logger.d(listenerTAG, "onConnectionStateChange: " + connectionState);
+//          if ("connected".equals(connectionState)) {
+//              mMainHandler.post(()-> {
+//                 enableChatDataProducer();
+//                 enableBotDataProducer();
+//              });
+//          }
+//
+//        }
         @Override
         public void onConnectionStateChange(Transport transport, String connectionState) {
-          Logger.d(listenerTAG, "onConnectionStateChange: " + connectionState);
-          if ("connected".equals(connectionState)) {
-              mMainHandler.post(()-> {
-                 enableChatDataProducer();
-                 enableBotDataProducer();
-              });
-          }
+            Logger.e("DEBUG_FLOW", "SendTransport state = " + connectionState);
+            Logger.d(listenerTAG, "SendTransport state = " + connectionState);
+
+            if ("connected".equals(connectionState)) {
+                mMainHandler.post(() -> {
+                    Logger.d(TAG, "✅ SendTransport CONNECTED");
+
+                    enableMic();
+                    enableCam();
+//
+//                    enableChatDataProducer();
+//                    enableBotDataProducer();
+                });
+            }
         }
+
+
+
       };
 
   private RecvTransport.Listener recvTransportListener =

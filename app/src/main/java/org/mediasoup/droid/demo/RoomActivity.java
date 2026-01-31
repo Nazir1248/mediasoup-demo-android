@@ -238,7 +238,7 @@ public class RoomActivity extends AppCompatActivity {
       Manifest.permission.INTERNET,
       Manifest.permission.RECORD_AUDIO,
       Manifest.permission.CAMERA,
-      Manifest.permission.WRITE_EXTERNAL_STORAGE
+//      Manifest.permission.WRITE_EXTERNAL_STORAGE
     };
     String rationale = "Please provide permissions";
     Permissions.Options options =
@@ -276,22 +276,48 @@ public class RoomActivity extends AppCompatActivity {
 
   @Override
   protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-    if (requestCode == REQUEST_CODE_SETTING) {
-      Logger.d(TAG, "request config done");
-      // close, dispose room related and clear store.
-      destroyRoom();
-      // local config and reCreate room related.
-      createRoom();
-      // check permission again. if granted, join room.
-      checkPermission();
-    } else {
+//    if (requestCode == REQUEST_CODE_SETTING) {
+//      Logger.d(TAG, "request config done");
+//      // close, dispose room related and clear store.
+//      destroyRoom();
+//      // local config and reCreate room related.
+//
+//      createRoom();
+//      // check permission again. if granted, join room.
+//      checkPermission();
+//    }
+      if (requestCode == REQUEST_CODE_SETTING) {
+          Logger.d(TAG, "request config done");
+
+          // 1. close old client
+          if (mRoomClient != null) {
+              mRoomClient.close();
+              mRoomClient = null;
+          }
+
+          // 2. create EVERYTHING fresh
+          createRoom();
+
+          // 3. re-join
+          checkPermission();
+      }
+
+
+      else {
       super.onActivityResult(requestCode, resultCode, data);
     }
   }
 
-  @Override
-  protected void onDestroy() {
-    super.onDestroy();
-    destroyRoom();
-  }
+//  @Override
+//  protected void onDestroy() {
+//    super.onDestroy();
+//    destroyRoom();
+//  }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+    }
+
+
 }

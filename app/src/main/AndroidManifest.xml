@@ -24,6 +24,7 @@
         <!-- Splash -->
         <activity
             android:name=".SplashScreenActivity"
+            android:exported="true"
             android:noHistory="true"
             android:screenOrientation="portrait"
             android:theme="@style/SplashScreenTheme">
